@@ -861,7 +861,8 @@ struct clock *clock_create(enum clock_type type, struct config *config,
 		config_get_int(config, NULL, "time_stamping");
 	int fadj = 0, max_adj = 0, sw_ts = timestamping == TS_SOFTWARE ? 1 : 0;
 	enum servo_type servo = config_get_int(config, NULL, "clock_servo");
-	int phc_index, required_modes = 0;
+	int phc_index;
+	unsigned required_modes = 0;
 	struct clock *c = &the_clock;
 	struct port *p;
 	unsigned char oui[OUI_LEN];
@@ -1682,7 +1683,7 @@ void clock_sync_interval(struct clock *c, int n)
 	shift = c->freq_est_interval - n;
 	if (shift < 0)
 		shift = 0;
-	else if (shift >= sizeof(int) * 8) {
+	else if ((unsigned)shift >= sizeof(int) * 8) {
 		shift = sizeof(int) * 8 - 1;
 		pr_warning("freq_est_interval is too long");
 	}
@@ -1691,7 +1692,7 @@ void clock_sync_interval(struct clock *c, int n)
 	shift = c->stats_interval - n;
 	if (shift < 0)
 		shift = 0;
-	else if (shift >= sizeof(int) * 8) {
+	else if ((unsigned)shift >= sizeof(int) * 8) {
 		shift = sizeof(int) * 8 - 1;
 		pr_warning("summary_interval is too long");
 	}
