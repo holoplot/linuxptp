@@ -672,7 +672,8 @@ static int add_ptp_source(struct ptp_domain *source,
 {
 	struct config_file *config_file;
 	char **command, *uds_path, **interfaces;
-	int i, j, num_interfaces, *phc, *phcs, hw_ts;
+	int i, j, num_interfaces, *phc, *phcs;
+	unsigned hw_ts;
 	struct sk_ts_info ts_info;
 
 	pr_debug("adding PTP domain %d", source->domain);
