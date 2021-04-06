@@ -71,7 +71,7 @@ char *cid2str(struct ClockIdentity *id)
 {
 	static char buf[64];
 	unsigned char *ptr = id->id;
-	snprintf(buf, sizeof(buf), "%02x%02x%02x.%02x%02x.%02x%02x%02x",
+	snprintf(buf, sizeof(buf), "%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x",
 		 ptr[0], ptr[1], ptr[2], ptr[3],
 		 ptr[4], ptr[5], ptr[6], ptr[7]);
 	return buf;
