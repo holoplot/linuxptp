@@ -29,6 +29,7 @@
 #include "tmv.h"
 #include "transport.h"
 
+struct tsproc; /*forward declaration*/
 struct ptp_message; /*forward declaration*/
 
 /** Opaque type. */
@@ -182,6 +183,16 @@ struct parent_ds *clock_parent_ds(struct clock *c);
  * @return   The parent port identity.
  */
 struct PortIdentity clock_parent_identity(struct clock *c);
+
+
+/**
+ * Update clock path delay to new slave ports value
+ * @param c The clock instance
+ * @param ppd The path delay of the current active port
+ */
+void clock_update_filter(struct clock *c, struct tsproc *tsproc);
+
+void clock_update_best_identity(struct clock *c, struct ClockIdentity *id);
 
 /**
  * Provide a data point to estimate the path delay.

@@ -1572,6 +1572,19 @@ void clock_peer_delay(struct clock *c, tmv_t ppd, tmv_t req, tmv_t rx,
 		stats_add_value(c->stats.delay, tmv_to_nanoseconds(ppd));
 }
 
+void clock_update_filter(struct clock *c, struct tsproc *tsproc) {
+	c->tsproc = tsproc;
+	//c->path_delay = ppd;
+	//tsproc_set_delay(c->tsproc, ppd);
+	//if (c->stats.delay)
+	//	stats_add_value(c->stats.delay, tmv_to_nanoseconds(c->path_delay));
+}
+
+void clock_update_best_identity(struct clock *c, struct ClockIdentity *id)
+{
+	memcpy(&c->best_id, id, sizeof(c->best_id));
+}
+
 int clock_slave_only(struct clock *c)
 {
 	return c->dds.flags & DDS_SLAVE_ONLY;
