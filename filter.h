@@ -31,6 +31,7 @@ struct filter;
 enum filter_type {
 	FILTER_MOVING_AVERAGE,
 	FILTER_MOVING_MEDIAN,
+	FILTER_OUTLIER_DETECT,
 };
 
 /**
@@ -39,7 +40,7 @@ enum filter_type {
  * @param length  The filter's length.
  * @return A pointer to a new filter on success, NULL otherwise.
  */
-struct filter *filter_create(enum filter_type type, int length);
+struct filter *filter_create(enum filter_type type, int length, double threshold);
 
 /**
  * Destroy an instance of a filter.

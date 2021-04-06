@@ -43,7 +43,7 @@ enum tsproc_mode {
  * @return               A pointer to a new tsproc on success, NULL otherwise.
  */
 struct tsproc *tsproc_create(enum tsproc_mode mode,
-			     enum filter_type delay_filter, int filter_length);
+			     enum filter_type delay_filter, int filter_length, double step_threshold);
 
 /**
  * Destroy a time stamp processor.

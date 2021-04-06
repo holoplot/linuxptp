@@ -45,10 +45,13 @@ struct tsproc {
 
 	/* Delay filter */
 	struct filter *delay_filter;
+
+	/* Outlier detection filter */
+	struct filter *outlier_detection_filter;
 };
 
 struct tsproc *tsproc_create(enum tsproc_mode mode,
-			     enum filter_type delay_filter, int filter_length)
+			     enum filter_type delay_filter, int filter_length, double step_threshold)
 {
 	struct tsproc *tsp;
 
@@ -78,8 +81,15 @@ struct tsproc *tsproc_create(enum tsproc_mode mode,
 		return NULL;
 	}
 
-	tsp->delay_filter = filter_create(delay_filter, filter_length);
+	tsp->delay_filter = filter_create(delay_filter, filter_length, 0.0);
 	if (!tsp->delay_filter) {
+		free(tsp);
+		return NULL;
+	}
+
+	tsp->outlier_detection_filter = filter_create(FILTER_OUTLIER_DETECT, 10, step_threshold);
+	if (!tsp->outlier_detection_filter) {
+		filter_destroy(tsp->delay_filter);
 		free(tsp);
 		return NULL;
 	}
@@ -91,6 +101,7 @@ struct tsproc *tsproc_create(enum tsproc_mode mode,
 
 void tsproc_destroy(struct tsproc *tsp)
 {
+	filter_destroy(tsp->outlier_detection_filter);
 	filter_destroy(tsp->delay_filter);
 	free(tsp);
 }

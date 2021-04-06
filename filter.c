@@ -20,14 +20,17 @@
 #include "filter_private.h"
 #include "mave.h"
 #include "mmedian.h"
+#include "outlier_detect.h"
 
-struct filter *filter_create(enum filter_type type, int length)
+struct filter *filter_create(enum filter_type type, int length, double step_threshold)
 {
 	switch (type) {
 	case FILTER_MOVING_AVERAGE:
 		return mave_create(length);
 	case FILTER_MOVING_MEDIAN:
 		return mmedian_create(length);
+	case FILTER_OUTLIER_DETECT:
+		return outlier_detect_create(length, step_threshold);
 	default:
 		return NULL;
 	}
