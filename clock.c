@@ -1644,9 +1644,10 @@ enum servo_state clock_synchronize(struct clock *c, tmv_t ingress, tmv_t origin)
 		clock_stats_update(c, tmv_to_nanoseconds(c->master_offset), adj);
 	} else {
 		pr_info("master offset %10" PRId64 " s%d freq %+7.0f "
-			"path delay %9" PRId64,
+			"path delay %9" PRId64 " ingress %9" PRId64,
 			tmv_to_nanoseconds(c->master_offset), state, adj,
-			tmv_to_nanoseconds(c->path_delay));
+			tmv_to_nanoseconds(c->path_delay),
+			tmv_to_nanoseconds(tmv_sub(ingress, origin)));
 	}
 
 	tsproc_set_clock_rate_ratio(c->tsproc, clock_rate_ratio(c));
