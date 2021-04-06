@@ -101,6 +101,9 @@ struct tsproc *tsproc_create(enum tsproc_mode mode,
 
 void tsproc_destroy(struct tsproc *tsp)
 {
+	if(!tsp)
+		return;
+
 	filter_destroy(tsp->outlier_detection_filter);
 	filter_destroy(tsp->delay_filter);
 	free(tsp);
@@ -202,6 +205,9 @@ int tsproc_update_offset(struct tsproc *tsp, tmv_t *offset, double *weight)
 
 void tsproc_reset(struct tsproc *tsp, int full)
 {
+	if(!tsp)
+		return;
+
 	tsp->t1 = tmv_zero();
 	tsp->t2 = tmv_zero();
 	tsp->t3 = tmv_zero();
