@@ -478,7 +478,7 @@ static int path_trace_append(struct port *p, struct ptp_message *m,
 			     struct parent_ds *dad)
 {
 	struct path_trace_tlv *ptt;
-	int length = 1 + dad->path_length;
+	unsigned length = 1 + dad->path_length;
 
 	if (length > PATH_TRACE_MAX) {
 		return 0;
@@ -937,7 +937,7 @@ static void port_nrate_initialize(struct port *p)
 
 	if (shift < 0)
 		shift = 0;
-	else if (shift >= sizeof(int) * 8) {
+	else if (shift >= (int)sizeof(int) * 8) {
 		shift = sizeof(int) * 8 - 1;
 		pr_warning("freq_est_interval is too long");
 	}
