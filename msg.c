@@ -126,7 +126,7 @@ static int suffix_post_recv(uint8_t *ptr, int len, struct tlv_extra *last)
 	if (!ptr)
 		return 0;
 
-	for (cnt = 0; len > sizeof(struct TLV); cnt++) {
+	for (cnt = 0; len > (int)sizeof(struct TLV); cnt++) {
 		tlv = (struct TLV *) ptr;
 		tlv->type = ntohs(tlv->type);
 		tlv->length = ntohs(tlv->length);
@@ -228,7 +228,7 @@ int msg_post_recv(struct ptp_message *m, int cnt)
 	int pdulen, type, err;
 	uint8_t *suffix = NULL;
 
-	if (cnt < sizeof(struct ptp_header))
+	if (cnt < (int)sizeof(struct ptp_header))
 		return -EBADMSG;
 
 	err = hdr_post_recv(&m->header);
