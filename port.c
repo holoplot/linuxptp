@@ -1695,6 +1695,29 @@ static void process_delay_resp(struct port *p, struct ptp_message *m)
 		  portnum(p), p->logMinDelayReqInterval);
 }
 
+void port_log_path_delay(struct port *p) {
+	struct stats_result delay_stats;
+
+	if (!p->received_announce)
+		return;
+
+	if (p->state != PS_PASSIVE || p->state != PS_SLAVE)
+		return;
+
+	if (stats_get_result(p->delay, &delay_stats) == 0) {
+		char master_ip[16];
+
+		inet_ntop(AF_INET, &p->master_ip, master_ip, sizeof(master_ip));
+
+		pr_info("port %hu: delay %5.0f +/- %3.0f %s %s", portnum(p),
+			delay_stats.mean, delay_stats.stddev,
+			pid2str(&p->announce_sourcePortIdentity),
+			master_ip);
+	}
+
+	stats_reset(p->delay);
+}
+
 static void process_follow_up(struct port *p, struct ptp_message *m)
 {
 	enum syfu_event event;
