@@ -97,6 +97,13 @@ int clockcheck_sample(struct clockcheck *cc, uint64_t ts)
 					" running slower than expected!");
 			ret = 1;
 		}
+
+		if (ret) {
+			pr_warning("interval      %lld", (long long)interval);
+			pr_warning("mono_interval %lld", (long long)mono_interval);
+			pr_warning("min_freq      %d", cc->min_freq);
+			pr_warning("max_freq      %d", cc->max_freq);
+		}
 	}
 
 	cc->last_mono_ts = mono_ts;
