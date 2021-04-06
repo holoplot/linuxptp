@@ -1546,13 +1546,14 @@ int clock_poll(struct clock *c)
 	return 0;
 }
 
-void clock_path_delay(struct clock *c, tmv_t req, tmv_t rx)
+void clock_path_delay(struct clock *c, tmv_t path_delay)
 {
-	tsproc_up_ts(c->tsproc, req, rx);
+	//tsproc_up_ts(c->tsproc, req, rx);
 
-	if (tsproc_update_delay(c->tsproc, &c->path_delay))
-		return;
+	//if (tsproc_update_delay(c->tsproc, &c->path_delay))
+	//	return;
 
+	c->path_delay = path_delay;
 	c->cur.meanPathDelay = tmv_to_TimeInterval(c->path_delay);
 
 	if (c->stats.delay)
