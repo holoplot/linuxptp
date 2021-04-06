@@ -1747,10 +1747,9 @@ static void handle_state_decision_event(struct clock *c)
 		best_id = c->dds.clockIdentity;
 	}
 
-	pr_notice("selected best master clock %s",
-		  cid2str(&best_id));
-
 	if (!cid_eq(&best_id, &c->best_id)) {
+		pr_notice("selected best master clock %s", cid2str(&best_id));
+
 		clock_freq_est_reset(c);
 		tsproc_reset(c->tsproc, 1);
 		c->ingress_ts = tmv_zero();
