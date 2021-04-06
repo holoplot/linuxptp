@@ -630,6 +630,9 @@ static int port_ignore(struct port *p, struct ptp_message *m)
 	if (m->header.domainNumber != clock_domain_number(p->clock)) {
 		return 1;
 	}
+	if (msg_type(m) == ANNOUNCE) {
+		return 0;
+	}
 
 	c1 = clock_identity(p->clock);
 	c2 = m->header.sourcePortIdentity.clockIdentity;
