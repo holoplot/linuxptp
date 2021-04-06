@@ -283,7 +283,7 @@ void clock_destroy(struct clock *c)
 		phc_close(c->clkid);
 	}
 	servo_destroy(c->servo);
-	tsproc_destroy(c->tsproc);
+	//tsproc_destroy(c->tsproc);
 	stats_destroy(c->stats.offset);
 	stats_destroy(c->stats.freq);
 	stats_destroy(c->stats.delay);
@@ -1088,14 +1088,15 @@ struct clock *clock_create(enum clock_type type, struct config *config,
 	}
 	c->servo_state = SERVO_UNLOCKED;
 	c->servo_type = servo;
-	c->tsproc = tsproc_create(config_get_int(config, NULL, "tsproc_mode"),
-				  config_get_int(config, NULL, "delay_filter"),
-				  config_get_int(config, NULL, "delay_filter_length"),
-				  config_get_double(config, NULL, "step_threshold"));
-	if (!c->tsproc) {
-		pr_err("Failed to create time stamp processor");
-		return NULL;
-	}
+	c->tsproc = NULL;
+	// c->tsproc = tsproc_create(config_get_int(config, NULL, "tsproc_mode"),
+	// 			  config_get_int(config, NULL, "delay_filter"),
+	// 			  config_get_int(config, NULL, "delay_filter_length"),
+	// 			  config_get_double(config, NULL, "step_threshold"));
+	// if (!c->tsproc) {
+	// 	pr_err("Failed to create time stamp processor");
+	// 	return NULL;
+	// }
 	c->nrr = 1.0;
 	c->stats_interval = config_get_int(config, NULL, "summary_interval");
 	c->stats.offset = stats_create();
@@ -1562,6 +1563,9 @@ void clock_path_delay(struct clock *c, tmv_t req, tmv_t rx)
 void clock_peer_delay(struct clock *c, tmv_t ppd, tmv_t req, tmv_t rx,
 		      double nrr)
 {
+	if (!c->tsproc)
+		return;
+
 	c->path_delay = ppd;
 	c->nrr = nrr;
 
@@ -1634,6 +1638,9 @@ enum servo_state clock_synchronize(struct clock *c, tmv_t ingress, tmv_t origin)
 {
 	double adj, weight;
 	enum servo_state state = SERVO_UNLOCKED;
+
+	if (!c->tsproc)
+		return c->servo_state;
 
 	c->ingress_ts = ingress;
 
