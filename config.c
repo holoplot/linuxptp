@@ -619,7 +619,7 @@ struct config *config_create(void)
 	char buf[CONFIG_LABEL_SIZE + 8];
 	struct config_item *ci;
 	struct config *cfg;
-	int i;
+	unsigned int i;
 
 	cfg = calloc(1, sizeof(*cfg));
 	if (!cfg) {
