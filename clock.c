@@ -1777,8 +1777,10 @@ static void handle_state_decision_event(struct clock *c)
 			event = EV_NONE;
 			break;
 		case PS_GRAND_MASTER:
-			pr_notice("assuming the grand master role");
-			clock_update_grandmaster(c);
+			if (!clock_slave_only(c)) {
+				pr_notice("assuming the grand master role");
+				clock_update_grandmaster(c);
+			}
 			event = EV_RS_GRAND_MASTER;
 			break;
 		case PS_MASTER:
