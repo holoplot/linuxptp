@@ -253,7 +253,7 @@ enum port_state ptp_slave_fsm(enum port_state state, enum fsm_event event,
 		case EV_RS_MASTER:
 		case EV_RS_GRAND_MASTER:
 		case EV_RS_PASSIVE:
-			next = PS_LISTENING;
+			next = PS_PASSIVE;
 			break;
 		case EV_RS_SLAVE:
 			next = PS_UNCALIBRATED;
@@ -263,7 +263,28 @@ enum port_state ptp_slave_fsm(enum port_state state, enum fsm_event event,
 		}
 		break;
 
-	case PS_UNCALIBRATED:
+	case PS_PASSIVE:
+		switch (event) {
+		case EV_DESIGNATED_DISABLED:
+			next = PS_DISABLED;
+			break;
+		case EV_FAULT_DETECTED:
+			next = PS_FAULTY;
+			break;
+		case EV_ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES:
+		case EV_RS_MASTER:
+		case EV_RS_GRAND_MASTER:
+            next = PS_PASSIVE;
+            break;
+		case EV_RS_SLAVE:
+			next = PS_UNCALIBRATED;
+			break;
+		default:
+			break;
+		}
+		break;
+
+    case PS_UNCALIBRATED:
 		switch (event) {
 		case EV_DESIGNATED_DISABLED:
 			next = PS_DISABLED;
@@ -275,7 +296,7 @@ enum port_state ptp_slave_fsm(enum port_state state, enum fsm_event event,
 		case EV_RS_MASTER:
 		case EV_RS_GRAND_MASTER:
 		case EV_RS_PASSIVE:
-			next = PS_LISTENING;
+			next = PS_PASSIVE;
 			break;
 		case EV_MASTER_CLOCK_SELECTED:
 			next = PS_SLAVE;
@@ -297,7 +318,7 @@ enum port_state ptp_slave_fsm(enum port_state state, enum fsm_event event,
 		case EV_RS_MASTER:
 		case EV_RS_GRAND_MASTER:
 		case EV_RS_PASSIVE:
-			next = PS_LISTENING;
+			next = PS_PASSIVE;
 			break;
 		case EV_SYNCHRONIZATION_FAULT:
 			next = PS_UNCALIBRATED;

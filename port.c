@@ -38,6 +38,9 @@
 #include "tsproc.h"
 #include "util.h"
 
+#include "ddt.h"
+#include "stats.h"
+
 #define ALLOWED_LOST_RESPONSES 3
 #define ANNOUNCE_SPAN 1
 
@@ -87,6 +90,14 @@ struct port {
 		UInteger16 delayreq;
 		UInteger16 sync;
 	} seqnum;
+
+	struct stats *delay;
+	tmv_t path_delay;
+	struct in_addr master_ip;
+	struct PortIdentity announce_sourcePortIdentity;
+	struct ClockIdentity grandmasterIdentity;
+	int received_announce;
+
 	tmv_t peer_delay;
 	struct tsproc *tsproc;
 	int log_sync_interval;
@@ -621,7 +632,7 @@ static int port_ignore(struct port *p, struct ptp_message *m)
 	if (path_trace_ignore(p, m)) {
 		return 1;
 	}
-	if (msg_transport_specific(m) != p->transportSpecific) {
+	if ((transport_type(p->trp) > TRANS_UDP_IPV6) && (msg_transport_specific(m) != p->transportSpecific)) {
 		return 1;
 	}
 	if (pid_eq(&m->header.sourcePortIdentity, &p->portIdentity)) {
@@ -1035,6 +1046,13 @@ static void port_synchronize(struct port *p,
 	c2 = correction_to_tmv(correction2);
 	t1c = tmv_add(t1, tmv_add(c1, c2));
 
+	// update for local port path delay calculation
+	tsproc_down_ts(p->tsproc, t1c, t2);
+	if (p->state == PS_PASSIVE) {
+		// don't synchronize clock to PASSIVE ports
+		return;
+	}
+
 	state = clock_synchronize(p->clock, t2, t1c);
 	switch (state) {
 	case SERVO_UNLOCKED:
@@ -1147,6 +1165,10 @@ static int port_pdelay_request(struct port *p)
 	struct ptp_message *msg;
 	int err;
 
+	if (!p->received_announce) {
+		return 0;
+	}
+
 	/* If multiple pdelay resp were not detected the counter can be reset */
 	if (!p->multiple_pdr_detected)
 		p->multiple_seq_pdr_count = 0;
@@ -1195,6 +1217,10 @@ out:
 static int port_delay_request(struct port *p)
 {
 	struct ptp_message *msg;
+
+	if (!p->received_announce) {
+		return 0;
+	}
 
 	/* Time to send a new request, forget current pdelay resp and fup */
 	if (p->peer_delay_resp) {
@@ -1492,6 +1518,11 @@ static int port_initialize(struct port *p)
 		p->fda.fd[FD_ANNOUNCE_TIMER + i] = fd[i];
 	}
 
+	p->received_announce = 0;
+	memset(&p->announce_sourcePortIdentity, 0, sizeof(struct PortIdentity));
+	memset(&p->grandmasterIdentity, 0, sizeof(struct ClockIdentity));
+	memset(&p->master_ip, 0, sizeof(struct in_addr));
+
 	if (port_set_announce_tmo(p))
 		goto no_tmo;
 
@@ -1538,7 +1569,7 @@ static int update_current_master(struct port *p, struct ptp_message *m)
 	struct path_trace_tlv *ptt;
 	struct timePropertiesDS tds;
 
-	if (!msg_source_equal(m, fc))
+	if (!fc || !msg_source_equal(m, fc))
 		return add_foreign_master(p, m);
 
 	if (p->state != PS_PASSIVE) {
@@ -1661,11 +1692,16 @@ static void process_delay_resp(struct port *p, struct ptp_message *m)
 	if (!p->delay_req)
 		return;
 
-	master = clock_parent_identity(p->clock);
+	// calculate path delay for PS_PASSIVE ports also
+	if ((p->state == PS_UNCALIBRATED) || (p->state == PS_SLAVE))
+		master = clock_parent_identity(p->clock);
+	else if (p->state == PS_PASSIVE)
+		master = p->announce_sourcePortIdentity;
+	else
+		return;
+
 	req = &p->delay_req->delay_req;
 
-	if (p->state != PS_UNCALIBRATED && p->state != PS_SLAVE)
-		return;
 	if (!pid_eq(&rsp->requestingPortIdentity, &req->hdr.sourcePortIdentity))
 		return;
 	if (rsp->hdr.sequenceId != ntohs(req->hdr.sequenceId))
@@ -1678,8 +1714,18 @@ static void process_delay_resp(struct port *p, struct ptp_message *m)
 	t4 = timestamp_to_tmv(m->ts.pdu);
 	t4c = tmv_sub(t4, c3);
 
-	clock_path_delay(p->clock, t3, t4c);
+	// local port path delay calculation for PS_UNCALIBRATED, PS_SLAVE and PS_PASSIVE ports
+	tsproc_up_ts(p->tsproc, t3, t4c);
+	if(tsproc_update_delay(p->tsproc, &p->path_delay))
+		//something went wrong
+		return;
 
+	stats_add_value(p->delay, tmv_to_nanoseconds(p->path_delay));
+
+	// update global clock path delay for PS_UNCALIBRATED and PS_SLAVE ports only
+	if (p->state != PS_PASSIVE) {
+		clock_path_delay(p->clock, p->path_delay);
+	}
 	if (p->logMinDelayReqInterval == rsp->hdr.logMessageInterval) {
 		return;
 	}
@@ -1733,25 +1779,34 @@ static void process_follow_up(struct port *p, struct ptp_message *m)
 	case PS_PRE_MASTER:
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
-	case PS_PASSIVE:
 		return;
+
+	case PS_PASSIVE:
+		if (p->received_announce == 0)
+			return;
+
+		if (!pid_eq(&p->announce_sourcePortIdentity, &m->header.sourcePortIdentity))
+			return;
+
+		break;
 	case PS_UNCALIBRATED:
 	case PS_SLAVE:
+		master = clock_parent_identity(p->clock);
+		if (!pid_eq(&master, &m->header.sourcePortIdentity))
+			return;
+
+		if (p->follow_up_info) {
+			struct follow_up_info_tlv *fui = follow_up_info_extract(m);
+			if (!fui)
+				return;
+
+			clock_follow_up_info(p->clock, fui);
+		}
+
 		break;
 	}
-	master = clock_parent_identity(p->clock);
-	if (memcmp(&master, &m->header.sourcePortIdentity, sizeof(master)))
-		return;
 
-	if (p->follow_up_info) {
-		struct follow_up_info_tlv *fui = follow_up_info_extract(m);
-		if (!fui)
-			return;
-		clock_follow_up_info(p->clock, fui);
-	}
-
-	if (p->syfu == SF_HAVE_SYNC &&
-	    p->last_syncfup->header.sequenceId == m->header.sequenceId) {
+	if (p->syfu == SF_HAVE_SYNC && p->last_syncfup->header.sequenceId == m->header.sequenceId) {
 		event = FUP_MATCH;
 	} else {
 		event = FUP_MISMATCH;
@@ -1763,6 +1818,9 @@ static int process_pdelay_req(struct port *p, struct ptp_message *m)
 {
 	struct ptp_message *rsp, *fup;
 	int err;
+
+	if (p->received_announce == 0)
+		return 0;
 
 	if (p->delayMechanism == DM_E2E) {
 		pr_warning("port %hu: pdelay_req on E2E port", portnum(p));
@@ -1931,6 +1989,9 @@ calc:
 
 static int process_pdelay_resp(struct port *p, struct ptp_message *m)
 {
+	if(p->received_announce == 0)
+		return -1;
+
 	if (p->peer_delay_resp) {
 		if (!source_pid_eq(p->peer_delay_resp, m)) {
 			pr_err("port %hu: multiple peer responses", portnum(p));
@@ -1998,20 +2059,27 @@ static void process_sync(struct port *p, struct ptp_message *m)
 	case PS_PRE_MASTER:
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
-	case PS_PASSIVE:
 		return;
+	case PS_PASSIVE:
+		if (p->received_announce == 0) {
+		            return;
+		}
+		if (!pid_eq(&p->announce_sourcePortIdentity, &m->header.sourcePortIdentity)) {
+			return;
+		}
+	        break;
 	case PS_UNCALIBRATED:
 	case PS_SLAVE:
-		break;
-	}
-	master = clock_parent_identity(p->clock);
-	if (memcmp(&master, &m->header.sourcePortIdentity, sizeof(master))) {
-		return;
-	}
+		master = clock_parent_identity(p->clock);
+		if (!pid_eq(&master, &m->header.sourcePortIdentity)) {
+			return;
+		}
 
-	if (m->header.logMessageInterval != p->log_sync_interval) {
-		p->log_sync_interval = m->header.logMessageInterval;
-		clock_sync_interval(p->clock, p->log_sync_interval);
+		if (m->header.logMessageInterval != p->log_sync_interval) {
+			p->log_sync_interval = m->header.logMessageInterval;
+			clock_sync_interval(p->clock, p->log_sync_interval);
+		}
+		break;
 	}
 
 	m->header.correction += p->asymmetry;
@@ -2040,6 +2108,9 @@ void port_close(struct port *p)
 	if (port_is_enabled(p)) {
 		port_disable(p);
 	}
+
+	stats_destroy(p->delay);
+
 	transport_destroy(p->trp);
 	tsproc_destroy(p->tsproc);
 	if (p->fault_fd >= 0)
@@ -2066,12 +2137,23 @@ struct foreign_clock *port_compute_best(struct port *p)
 		if (fc->n_messages < FOREIGN_MASTER_THRESHOLD)
 			continue;
 
-		if (!p->best)
+		if (!p->best) {
 			p->best = fc;
-		else if (dscmp(&fc->dataset, &p->best->dataset) > 0)
+			// save portIdentity of announcing device for passive port (where PTP-Master != PS_PASSIVE_MASTER)
+			memcpy(&p->announce_sourcePortIdentity, &tmp->header.sourcePortIdentity, sizeof(struct PortIdentity));
+			memcpy(&p->master_ip, &tmp->address.sin.sin_addr, sizeof(struct in_addr));
+			memcpy(&p->grandmasterIdentity, &fc->dataset.identity, sizeof(struct ClockIdentity));
+			p->received_announce = 1;
+		} else if (dscmp(&fc->dataset, &p->best->dataset) > 0) {
 			p->best = fc;
-		else
+
+			memcpy(&p->announce_sourcePortIdentity, &tmp->header.sourcePortIdentity, sizeof(struct PortIdentity));
+			memcpy(&p->master_ip, &tmp->address.sin.sin_addr, sizeof(struct in_addr));
+			memcpy(&p->grandmasterIdentity, &fc->dataset.identity, sizeof(struct ClockIdentity));
+			p->received_announce = 1;
+		} else {
 			fc_clear(fc);
+		}
 	}
 
 	return p->best;
@@ -2092,20 +2174,28 @@ static void port_e2e_transition(struct port *p, enum port_state next)
 	case PS_FAULTY:
 	case PS_DISABLED:
 		port_disable(p);
+		p->received_announce = 0;
 		break;
 	case PS_LISTENING:
+		p->received_announce = 0;
 		port_set_announce_tmo(p);
 		break;
 	case PS_PRE_MASTER:
+		p->received_announce = 0;
 		port_set_qualification_tmo(p);
 		break;
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
+		p->received_announce = 0;
 		set_tmo_log(p->fda.fd[FD_MANNO_TIMER], 1, -10); /*~1ms*/
 		port_set_sync_tx_tmo(p);
 		break;
 	case PS_PASSIVE:
+		flush_last_sync(p);
+		flush_delay_req(p);
 		port_set_announce_tmo(p);
+		// send delay requests as well to be able to calculate path delay
+		port_set_delay_tmo(p);
 		break;
 	case PS_UNCALIBRATED:
 		flush_last_sync(p);
@@ -2133,15 +2223,19 @@ static void port_p2p_transition(struct port *p, enum port_state next)
 	case PS_FAULTY:
 	case PS_DISABLED:
 		port_disable(p);
+		p->received_announce = 0;
 		break;
 	case PS_LISTENING:
 		port_set_announce_tmo(p);
+		p->received_announce = 0;
 		break;
 	case PS_PRE_MASTER:
+		p->received_announce = 0;
 		port_set_qualification_tmo(p);
 		break;
 	case PS_MASTER:
 	case PS_GRAND_MASTER:
+		p->received_announce = 0;
 		set_tmo_log(p->fda.fd[FD_MANNO_TIMER], 1, -10); /*~1ms*/
 		port_set_sync_tx_tmo(p);
 		break;
@@ -2165,9 +2259,9 @@ int port_dispatch(struct port *p, enum fsm_event event, int mdiff)
 	int fri_asap = 0;
 
 	if (clock_slave_only(p->clock)) {
-		if (event == EV_RS_MASTER || event == EV_RS_GRAND_MASTER) {
-			port_slave_priority_warning(p);
-		}
+		//if (event == EV_RS_MASTER || event == EV_RS_GRAND_MASTER) {
+		//	port_slave_priority_warning(p);
+		//}
 		next = ptp_slave_fsm(p->state, event, mdiff);
 	} else {
 		next = ptp_fsm(p->state, event, mdiff);
@@ -2207,8 +2301,14 @@ int port_dispatch(struct port *p, enum fsm_event event, int mdiff)
 		port_e2e_transition(p, next);
 	}
 
+	if ((p->state == PS_PASSIVE) && p->received_announce)
+		clock_update_best_identity(p->clock, &p->announce_sourcePortIdentity.clockIdentity);
+
 	p->state = next;
 	port_notify_event(p, NOTIFY_PORT_STATE);
+
+	if((next == PS_UNCALIBRATED) || (next == PS_SLAVE))
+		clock_update_filter(p->clock, p->tsproc);
 
 	if (p->jbod && next == PS_UNCALIBRATED) {
 		if (clock_switch_phc(p->clock, p->phc_index)) {
@@ -2235,10 +2335,15 @@ enum fsm_event port_event(struct port *p, int fd_index)
 		if (p->best)
 			fc_clear(p->best);
 		port_set_announce_tmo(p);
-		if (clock_slave_only(p->clock) && p->delayMechanism != DM_P2P &&
-		    port_renew_transport(p)) {
-			return EV_FAULT_DETECTED;
-		}
+		//if (clock_slave_only(p->clock) && p->delayMechanism != DM_P2P &&
+		//    port_renew_transport(p)) {
+		//	return EV_FAULT_DETECTED;
+		//}
+
+		p->received_announce = 0;
+		memset(&p->announce_sourcePortIdentity, 0, sizeof(p->announce_sourcePortIdentity));
+		memset(&p->grandmasterIdentity, 0, sizeof(p->grandmasterIdentity));
+		memset(&p->master_ip, 0, sizeof(p->master_ip));
 		return EV_ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES;
 
 	case FD_DELAY_TIMER:
@@ -2331,8 +2436,8 @@ enum fsm_event port_event(struct port *p, int fd_index)
 	case SIGNALING:
 		break;
 	case MANAGEMENT:
-		if (clock_manage(p->clock, p, msg))
-			event = EV_STATE_DECISION_EVENT;
+		//if (clock_manage(p->clock, p, msg))
+		//	event = EV_STATE_DECISION_EVENT;
 		break;
 	}
 
@@ -2622,6 +2727,7 @@ struct port *port_open(int phc_index,
 	p->state = PS_INITIALIZING;
 	p->delayMechanism = config_get_int(cfg, p->name, "delay_mechanism");
 	p->versionNumber = PTP_VERSION;
+	p->delay = stats_create();
 
 	if (p->hybrid_e2e && p->delayMechanism != DM_E2E) {
 		pr_warning("port %d: hybrid_e2e only works with E2E", number);
