@@ -24,6 +24,8 @@
 #include <unistd.h>
 #include <sys/queue.h>
 
+#include "rv_ptp_ifc.h"
+
 #include "bmc.h"
 #include "clock.h"
 #include "filter.h"
@@ -2778,4 +2780,89 @@ err_port:
 enum port_state port_state(struct port *port)
 {
 	return port->state;
+}
+
+//////////////////////////////////////////
+// start RAVENNA IPC implementation here
+//////////////////////////////////////////
+#include "netinet/in.h"
+#include "arpa/inet.h"
+
+int rv_get_port_status(struct rv_ptpport_t *rv_ptpport, struct port *p) {
+
+    memset(rv_ptpport, 0, sizeof(struct rv_ptpport_t));
+    strncpy(rv_ptpport->ifc_name, p->name, RV_IFC_NAME_LEN - 1);
+    
+    if(!p || !port_is_enabled(p)) {
+        rv_ptpport->state = PS_DISABLED;
+        return 0;
+    }
+    
+    rv_ptpport->state = p->state;
+
+    // set rv_clock->port.master_ip here
+    switch(p->state) {
+        case PS_PASSIVE:
+            if(p->received_announce) {
+                strncpy(rv_ptpport->master_ip, inet_ntoa(p->master_ip), INET6_ADDRSTRLEN - 1);
+                strncpy(rv_ptpport->master_id, cid2str(&p->announce_sourcePortIdentity.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+                strncpy(rv_ptpport->grandmaster_id, cid2str(&p->grandmasterIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+
+                rv_ptpport->path_delay = p->path_delay;
+            } else {
+                // currently no foreign master available, use local values
+                struct in_addr master;
+
+                // take only IPv4 addresses into consideration here
+				if(transport_protocol_addr(p->trp, (uint8_t*)&master.s_addr)) {
+					// there should be a valid transport protocol address
+	                strncpy(rv_ptpport->master_ip, inet_ntoa(master), INET6_ADDRSTRLEN - 1);
+				} else {
+					// no transport address available yet
+	                strncpy(rv_ptpport->master_ip, "0.0.0.0", INET6_ADDRSTRLEN - 1);
+				}
+
+                strncpy(rv_ptpport->master_id, cid2str(&p->portIdentity.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+                strncpy(rv_ptpport->grandmaster_id, cid2str(&p->portIdentity.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+            }
+            break;
+        case PS_UNCALIBRATED:
+        case PS_SLAVE:
+            strncpy(rv_ptpport->master_ip, inet_ntoa(p->master_ip), INET6_ADDRSTRLEN - 1);
+            strncpy(rv_ptpport->master_id, cid2str(&p->announce_sourcePortIdentity.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+            strncpy(rv_ptpport->grandmaster_id, cid2str(&p->grandmasterIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+
+            rv_ptpport->path_delay = p->path_delay;
+            break;
+        case PS_MASTER:
+        case PS_GRAND_MASTER:
+            if(transport_type(p->trp) == TRANS_UDP_IPV4) {
+                struct in_addr master;
+
+                // take only IPv4 addresses into consideration here
+                transport_protocol_addr(p->trp, (uint8_t*)&master.s_addr);
+                strncpy(rv_ptpport->master_ip, inet_ntoa(master), INET6_ADDRSTRLEN - 1);
+            }
+            strncpy(rv_ptpport->master_id, cid2str(&p->portIdentity.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+
+            if(p->state == PS_MASTER) {
+                struct parent_ds *dad = clock_parent_ds(p->clock);
+                strncpy(rv_ptpport->grandmaster_id, cid2str(&dad->pds.grandmasterIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+            }
+            
+            if(p->state == PS_GRAND_MASTER) {
+                // fix non standard PS_GRAND_MASTER status
+                rv_ptpport->state = PS_MASTER;
+                
+                // copy local clock ID as grandmaster ID
+                strncpy(rv_ptpport->grandmaster_id, cid2str(&p->portIdentity.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+            }
+            break;
+        default: 
+            break;
+    }
+    
+    rv_ptpport->version_number = p->versionNumber;
+
+    return 0;
 }

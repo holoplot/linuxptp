@@ -24,6 +24,8 @@
 #include <time.h>
 #include <sys/queue.h>
 
+#include "rv_ptp_ifc.h"
+
 #include "address.h"
 #include "bmc.h"
 #include "clock.h"
@@ -1824,4 +1826,41 @@ void clock_check_ts(struct clock *c, struct timespec ts)
 double clock_rate_ratio(struct clock *c)
 {
 	return servo_rate_ratio(c->servo);
+}
+
+//////////////////////////////////////////
+// start RAVENNA IPC implementation here
+//////////////////////////////////////////
+extern int rv_get_port_status(struct rv_ptpport_t *rv_ptpport, struct port *p);
+
+int rv_get_clock_status(struct rv_ptpclock_t *rv_clock, struct clock *c) {
+	struct port *piter = NULL;
+
+	if (!c)
+		return -1;
+
+	strncpy(rv_clock->clk_id, cid2str(&c->dds.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+
+	rv_clock->offset = tmv_to_nanoseconds(c->master_offset);
+	rv_clock->offset_sign = 0;
+
+	if (rv_clock->offset < 0)
+		rv_clock->offset_sign = 1;
+
+	rv_clock->clk_accuracy = c->dds.clockQuality.clockAccuracy;
+	rv_clock->clk_class    = c->dds.clockQuality.clockClass;
+
+	rv_clock->traceable = (c->tds.flags & TIME_TRACEABLE) != 0;
+
+	rv_clock->port_count = 0;
+
+	LIST_FOREACH(piter, &c->ports, list) {
+		if (rv_clock->port_count >= RV_PTP_MAX_PORTS)
+			break;
+
+		rv_get_port_status(&rv_clock->port[rv_clock->port_count], piter);
+		++rv_clock->port_count;
+	}
+
+	return 0;
 }
