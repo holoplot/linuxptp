@@ -79,7 +79,7 @@ static void usage(char *progname)
 		HWTSTAMP_TX_ON);
 }
 
-int main(int argc, char *argv[])
+int hwstamp_ctl_main(int argc, char *argv[])
 {
 	struct ifreq ifreq;
 	struct hwtstamp_config cfg;

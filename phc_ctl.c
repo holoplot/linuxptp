@@ -499,7 +499,7 @@ static int run_cmds(clockid_t clkid, int cmdc, char *cmdv[])
 	return 0;
 }
 
-int main(int argc, char *argv[])
+int phc_ctl_main(int argc, char *argv[])
 {
 	const char *progname;
 	char **cmdv, *default_cmdv[] = { "caps" };

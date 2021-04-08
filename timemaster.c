@@ -1151,7 +1151,7 @@ static void usage(char *progname)
 		progname);
 }
 
-int main(int argc, char **argv)
+int timemaster_main(int argc, char **argv)
 {
 	struct timemaster_config *config;
 	struct script *script;

@@ -70,19 +70,37 @@ static void usage(char *progname)
 		progname);
 }
 
-int main(int argc, char *argv[])
+static struct config *cfg = NULL;
+
+//////////////////////////////////////////////////////////
+// Changes for RAVENNA:
+// * add ptp4l_exit()
+// * rename main() into ptp4l_init()
+// * change return type of ptp4l_init() to void*
+// * change return value of ptp4l_init() to struct clock*
+//////////////////////////////////////////////////////////
+void ptp4l_exit(struct clock *clock) {
+    if (clock) {
+        clock_destroy(clock);
+    }
+
+    if(cfg) {
+        config_destroy(cfg);
+    }
+}
+
+void* ptp4l_init(int argc, char *argv[], int force_slave_only)
 {
 	char *config = NULL, *req_phc = NULL, *progname;
-	int c, err = -1, print_level;
+	int c, print_level;
 	struct clock *clock = NULL;
-	struct config *cfg;
 
 	if (handle_term_signals())
-		return -1;
+		return NULL;
 
 	cfg = config_create();
 	if (!cfg) {
-		return -1;
+		return NULL;
 	}
 
 	/* Process the command line arguments. */
@@ -158,10 +176,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			version_show(stdout);
-			return 0;
+			return NULL;
 		case 'h':
 			usage(progname);
-			return 0;
+			return NULL;
 		case '?':
 			usage(progname);
 			goto out;
@@ -172,7 +190,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (config && (c = config_read(config, cfg))) {
-		return c;
+		return NULL;
 	}
 
 	print_set_progname(progname);
@@ -195,6 +213,10 @@ int main(int argc, char *argv[])
 		goto out;
 	}
 
+	if(force_slave_only) {
+            config_set_int(cfg, "slaveOnly", 1);
+        }
+	
 	clock = clock_create(cfg->n_interfaces > 1 ? CLOCK_TYPE_BOUNDARY :
 			     CLOCK_TYPE_ORDINARY, cfg, req_phc);
 	if (!clock) {
@@ -202,15 +224,10 @@ int main(int argc, char *argv[])
 		goto out;
 	}
 
-	err = 0;
+    return clock;
 
-	while (is_running()) {
-		if (clock_poll(clock))
-			break;
-	}
 out:
-	if (clock)
-		clock_destroy(clock);
-	config_destroy(cfg);
-	return err;
+    ptp4l_exit(clock);
+
+    return NULL;
 }
