@@ -176,6 +176,7 @@ int tsproc_update_delay(struct tsproc *tsp, tmv_t *delay)
 int tsproc_update_offset(struct tsproc *tsp, tmv_t *offset, double *weight)
 {
 	tmv_t delay, raw_delay = 0;
+	tmv_t offset_from_master;
 
 	if (tmv_is_zero(tsp->t1) || tmv_is_zero(tsp->t2) ||
 	    tmv_is_zero(tsp->t3))
@@ -187,7 +188,10 @@ int tsproc_update_offset(struct tsproc *tsp, tmv_t *offset, double *weight)
 	delay = tsp->raw_mode ? raw_delay : tsp->filtered_delay;
 
 	/* offset = t2 - t1 - delay */
-	*offset = tmv_sub(tmv_sub(tsp->t2, tsp->t1), delay);
+	offset_from_master = tmv_sub(tmv_sub(tsp->t2, tsp->t1), delay);
+
+	// filter current offset through outlier detection here
+	*offset = filter_sample(tsp->outlier_detection_filter, offset_from_master);
 
 	if (!weight)
 		return 0;
