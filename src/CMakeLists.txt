@@ -46,9 +46,7 @@ if(NOT DEFINED pkg_jansson_FOUND)
     pkg_search_module(pkg_jansson REQUIRED jansson)
 endif()
 
-if(NOT DEFINED pkg_paho_mqtt_FOUND)
-    pkg_search_module(pkg_paho_mqtt REQUIRED paho-mqtt3as)
-endif()
+find_library(PAHO_MQTT paho-mqtt3as REQUIRED)
 
 if(NOT DEFINED pkg_libmd5_FOUND)
     pkg_search_module(pkg_libmd5 REQUIRED libmd5)
@@ -60,7 +58,6 @@ target_include_directories(ptp4l
     PRIVATE 
         ${pkg_uv_INCLUDE_DIRS} 
         ${pkg_jansson_INCLUDE_DIRS} 
-        ${pkg_paho_mqtt_INCLUDE_DIRS} 
         ${pkg_libmd5_INCLUDE_DIRS}
 )
 
@@ -68,7 +65,7 @@ target_link_libraries(ptp4l
     PRIVATE
         ${pkg_uv_LIBRARIES} 
         ${pkg_jansson_LIBRARIES} 
-        ${pkg_paho_mqtt_LIBRARIES} 
+        ${PAHO_MQTT} 
         md5 
         ${EXT_LIBS}
 )
