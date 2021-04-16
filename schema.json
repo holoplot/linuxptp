@@ -1,0 +1,187 @@
+{
+    "description": "This schema defines the 'data' payload of the PTP JSON RPC messages exchanged via MQTT.",
+    "definitions": {
+        "clockConfigure": {
+            "description": "Configuration of the PTP clock. MQTT topic: 'ptp/request', JSON-RPC method: 'clockConfigure'",
+            "type": "object",
+            "properties": {
+                "ptp_domain": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 127
+                },
+                "ptp_slave_only": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1
+                },
+                "ptp_prio_1": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                },
+                "ptp_prio_2": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                },
+                "ptp_event_priority": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 63
+                },
+                "ptp_general_priority": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 63
+                },
+                "ptp_delay_mechanism": {
+                    "type": "integer",
+                    "description": "1: E2E, 2: P2P",
+                    "minimum": 1,
+                    "maximum": 2
+                },
+                "ptp_log_announce": {
+                    "type": "integer"
+                },
+                "ptp_log_sync": {
+                    "type": "integer"
+                },
+                "ptp_ttl": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                }
+            },
+            "required": ["ptp_domain", "ptp_slave_only", "ptp_prio_1", "ptp_prio_2",
+                    "ptp_event_priority", "ptp_general_priority", "ptp_delay_mechanism", "ptp_log_announce", "ptp_log_sync", "ptp_ttl"]
+        },
+
+        "clockStatus": {
+            "description": "The status of PTP clock. MQTT topic: 'ptp/clock/status', JSON-RPC method: 'clockStatus'",
+            "type": "object",
+            "properties": {
+                "ptp_clock_id": {
+                    "type": "string"
+                },
+                "ptp_clock_class": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                },
+                "ptp_clock_accuracy": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                },
+                "ptp_domain": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 127
+                },
+                "ptp_slave_only": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1
+                },
+                "ptp_prio_1": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                },
+                "ptp_prio_2": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                },
+                "ptp_event_priority": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 63
+                },
+                "ptp_general_priority": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 63
+                },
+                "ptp_port_count": {
+                    "type": "integer"
+                }
+            },
+            "required": ["ptp_clock_id", "ptp_clock_class", "ptp_clock_accuracy", "ptp_domain", "ptp_slave_only", "ptp_prio_1", "ptp_prio_2",
+                    "ptp_event_priority", "ptp_general_priority", "ptp_port_count"]
+        },
+
+        "portStatus": {
+            "description": "Updates the port status of an individual port. MQTT topic: 'ptp/port/<port>/status', JSON-RPC method: 'portStatus'",
+            "type": "object",
+            "properties": {
+                "ptp_port_name": {
+                    "type": "string"
+                },
+                "ptp_port_state": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9
+
+                },
+                "ptp_master_id": {
+                    "type": "string",
+                    "pattern": "^([0-9A-Fa-f]{2}-){7}([0-9A-Fa-f]{2})$"
+                },
+                "ptp_master_ip": {
+                    "type": "string"
+                },
+                "ptp_grandmaster_id": {
+                    "type": "string",
+                    "pattern": "^([0-9A-Fa-f]{2}-){7}([0-9A-Fa-f]{2})$"
+                },
+                "ptp_delay_mechanism": {
+                    "type": "integer",
+                    "description": "1: E2E, 2: P2P",
+                    "minimum": 1,
+                    "maximum": 2
+                },
+                "ptp_log_announce": {
+                    "type": "integer"
+                },
+                "ptp_log_sync": {
+                    "type": "integer"
+                },
+                "ptp_ttl": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                }
+            },
+            "required": ["ptp_port_name", "ptp_port_state", "ptp_master_id", "ptp_master_ip", "ptp_delay_mechanism", "ptp_log_announce", "ptp_log_sync", "ptp_ttl"]
+        },
+
+        "offsetToMaster": {
+            "description": "Updates the current offset to master if slaved to another master. MQTT topic: 'ptp/clock/offset', JSON-RPC method: 'offsetToMaster'",
+            "type": "object",
+            "properties": {
+                "ptp_offset_nsec": {
+                    "type": "integer",
+                    "description": "offset in nano seconds"
+                }
+            },
+            "required": ["ptp_offset_nsec"]
+        },
+
+        "pathDelay": {
+            "description": "Updates the measured path delay to the master for this port. MQTT topic: 'ptp/port/<port>/path_delay', JSON-RPC method: 'pathDelay'",
+            "type": "object",
+            "properties": {
+                "ptp_port_name": {
+                    "type": "string"
+                },
+                "ptp_path_delay": {
+                    "type": "integer",
+                    "description": "path delay of this port in nano seconds"
+                }
+            },
+            "required": ["ptp_port_name", "ptp_path_delay"]
+        }
+    }
+}
