@@ -19,7 +19,7 @@
 #include "rv_random.h"
 #include "rv_init.h"
 
-#include "libmd5/md5.h"
+#include "md5.h"
 
 #include <time.h>
 #include <string.h>
