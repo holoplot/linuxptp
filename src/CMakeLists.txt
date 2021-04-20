@@ -62,6 +62,7 @@ target_link_libraries(ptp4l
         ${pkg_jansson_LIBRARIES} 
         ${PAHO_MQTT} 
         ${EXT_LIBS}
+	m
 )
 
 install (TARGETS ptp4l DESTINATION bin)
