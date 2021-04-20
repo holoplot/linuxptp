@@ -56,12 +56,13 @@ target_include_directories(ptp4l
         ${pkg_jansson_INCLUDE_DIRS} 
 )
 
-target_link_libraries(ptp4l 
+target_link_libraries(ptp4l
     PRIVATE
         ${pkg_uv_LIBRARIES} 
         ${pkg_jansson_LIBRARIES} 
         ${PAHO_MQTT}
         ${EXT_LIBS}
+	m
 )
 
 install (TARGETS ptp4l DESTINATION bin)
