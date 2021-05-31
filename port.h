@@ -323,11 +323,4 @@ enum fault_type last_fault_type(struct port *port);
 int fault_interval(struct port *port, enum fault_type ft,
 	struct fault_interval *i);
 
-/**
- * Log path delay on given port.
- *
- * @param port        A port instance.
- */
-void port_log_path_delay(struct port *p);
-
 #endif

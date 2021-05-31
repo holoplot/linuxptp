@@ -203,6 +203,7 @@ void clock_update_best_identity(struct clock *c, struct ClockIdentity *id);
  *                    correction.
  */
 void clock_path_delay(struct clock *c, tmv_t ppd);
+//void clock_path_delay(struct clock *c, tmv_t req, tmv_t rx);
 
 /**
  * Provide the estimated peer delay from a slave port.

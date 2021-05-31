@@ -198,14 +198,14 @@ int sk_interface_addr(const char *name, int family, struct address *addr)
 		return -1;
 	}
 	for (i = ifaddr; i; i = i->ifa_next) {
-		// ignore service interface alias for ip assignment
-		char *alias = strchr(i->ifa_name, ':');
-		if (alias) {
-			alias++;
-			if (!strncmp(alias, "service", 7))
-				continue;
-		}
-
+        // ignore service interface alias for ip assignment
+        char *alias = strchr(i->ifa_name, ':');
+        if(alias) {
+            alias = alias + 1;
+            if(!strncmp(alias, "service", 7)) {
+                continue;
+            }
+        }
 		if (i->ifa_addr && family == i->ifa_addr->sa_family &&
 			strcmp(name, i->ifa_name) == 0)
 		{

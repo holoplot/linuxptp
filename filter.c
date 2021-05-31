@@ -29,8 +29,8 @@ struct filter *filter_create(enum filter_type type, int length, double step_thre
 		return mave_create(length);
 	case FILTER_MOVING_MEDIAN:
 		return mmedian_create(length);
-	case FILTER_OUTLIER_DETECT:
-		return outlier_detect_create(length, step_threshold);
+    case FILTER_OUTLIER_DETECT:
+        return outlier_detect_create(length, step_threshold);
 	default:
 		return NULL;
 	}

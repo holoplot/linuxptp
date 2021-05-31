@@ -199,7 +199,8 @@ static int udp_open(struct transport *t, const char *name, struct fdarray *fda,
 
 	fda->fd[FD_EVENT] = efd;
 	fda->fd[FD_GENERAL] = gfd;
-	return 0;
+
+    return 0;
 
 no_timestamping:
 	close(gfd);

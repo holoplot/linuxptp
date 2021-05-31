@@ -88,24 +88,26 @@ struct tsproc *tsproc_create(enum tsproc_mode mode,
 	}
 
 	tsp->outlier_detection_filter = filter_create(FILTER_OUTLIER_DETECT, 10, step_threshold);
-	if (!tsp->outlier_detection_filter) {
-		filter_destroy(tsp->delay_filter);
-		free(tsp);
-		return NULL;
-	}
+    if(!tsp->outlier_detection_filter) {
+        filter_destroy(tsp->delay_filter);
+        free(tsp);
+        return NULL;
+    }
 
-	tsp->clock_rate_ratio = 1.0;
+    tsp->clock_rate_ratio = 1.0;
 
 	return tsp;
 }
 
 void tsproc_destroy(struct tsproc *tsp)
 {
-	if(!tsp)
-		return;
-
-	filter_destroy(tsp->outlier_detection_filter);
+    if(!tsp) {
+        return;
+    }
+    
+    filter_destroy(tsp->outlier_detection_filter);
 	filter_destroy(tsp->delay_filter);
+
 	free(tsp);
 }
 
@@ -176,11 +178,12 @@ int tsproc_update_delay(struct tsproc *tsp, tmv_t *delay)
 int tsproc_update_offset(struct tsproc *tsp, tmv_t *offset, double *weight)
 {
 	tmv_t delay, raw_delay = 0;
+
 	tmv_t offset_from_master;
 
-	if (tmv_is_zero(tsp->t1) || tmv_is_zero(tsp->t2) ||
-	    tmv_is_zero(tsp->t3))
+	if (tmv_is_zero(tsp->t1) || tmv_is_zero(tsp->t2) || tmv_is_zero(tsp->t3)) {
 		return -1;
+	}
 
 	if (tsp->raw_mode || tsp->weighting)
 		raw_delay = get_raw_delay(tsp);
@@ -191,7 +194,7 @@ int tsproc_update_offset(struct tsproc *tsp, tmv_t *offset, double *weight)
 	offset_from_master = tmv_sub(tmv_sub(tsp->t2, tsp->t1), delay);
 
 	// filter current offset through outlier detection here
-	*offset = filter_sample(tsp->outlier_detection_filter, offset_from_master);
+    *offset = filter_sample(tsp->outlier_detection_filter, offset_from_master);
 
 	if (!weight)
 		return 0;
@@ -209,9 +212,10 @@ int tsproc_update_offset(struct tsproc *tsp, tmv_t *offset, double *weight)
 
 void tsproc_reset(struct tsproc *tsp, int full)
 {
-	if(!tsp)
-		return;
-
+    if(!tsp) {
+        return;
+    }
+    
 	tsp->t1 = tmv_zero();
 	tsp->t2 = tmv_zero();
 	tsp->t3 = tmv_zero();

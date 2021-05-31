@@ -51,6 +51,8 @@
 #define N_CLOCK_PFD (N_POLLFD + 1) /* one extra per port, for the fault timer */
 #define POW2_41 ((double)(1ULL << 41))
 
+extern void port_log_path_delay(struct port *p);
+
 struct port {
 	LIST_ENTRY(port) list;
 };
@@ -237,8 +239,10 @@ static void clock_prune_subscriptions(struct clock *c)
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	LIST_FOREACH_SAFE(s, &c->subscribers, list, tmp) {
 		if (s->expiration <= now.tv_sec) {
-			pr_info("subscriber %s timed out",
-				pid2str(&s->targetPortIdentity));
+            char target_pid[64];
+            
+            pid2str(target_pid, 64, &s->targetPortIdentity);
+			pr_info("subscriber %s timed out", target_pid);
 			remove_subscriber(s);
 		}
 	}
@@ -343,7 +347,7 @@ static void clock_link_status(void *ctx, int index, int linkup)
 		port_dispatch(p, EV_FAULT_CLEARED, 0);
 	} else {
 		port_dispatch(p, EV_FAULT_DETECTED, 0);
-		c->sde = 1;
+        c->sde = 1;
 	}
 }
 
@@ -556,12 +560,10 @@ static int clock_management_set(struct clock *c, struct port *p,
 	return respond ? 1 : 0;
 }
 
-static void clock_stats_update(struct clock *c,
-				int64_t offset, double freq)
+static void clock_stats_update(struct clock *c, struct clock_stats *s,
+			       int64_t offset, double freq)
 {
 	struct stats_result offset_stats, freq_stats, delay_stats;
-	struct clock_stats *s = &c->stats;
-	struct port* p;
 
 	stats_add_value(s->offset, offset);
 	stats_add_value(s->freq, freq);
@@ -587,8 +589,10 @@ static void clock_stats_update(struct clock *c,
 			freq_stats.mean, freq_stats.stddev);
 	}
 
-	LIST_FOREACH(p, &c->ports, list)
-		port_log_path_delay(p);
+    struct port* piter; 
+    LIST_FOREACH(piter, &c->ports, list) {
+        port_log_path_delay(piter);
+    }
 
 	stats_reset(s->offset);
 	stats_reset(s->freq);
@@ -632,7 +636,7 @@ static enum servo_state clock_no_adjust(struct clock *c, tmv_t ingress,
 	freq = (1.0 - ratio) * 1e9;
 
 	if (c->stats.max_count > 1) {
-		clock_stats_update(c, tmv_to_nanoseconds(c->master_offset), freq);
+		clock_stats_update(c, &c->stats, tmv_to_nanoseconds(c->master_offset), freq);
 	} else {
 		pr_info("master offset %10" PRId64 " s%d freq %+7.0f "
 			"path delay %9" PRId64,
@@ -864,7 +868,7 @@ struct clock *clock_create(enum clock_type type, struct config *config,
 	int fadj = 0, max_adj = 0, sw_ts = timestamping == TS_SOFTWARE ? 1 : 0;
 	enum servo_type servo = config_get_int(config, NULL, "clock_servo");
 	int phc_index;
-	unsigned required_modes = 0;
+        unsigned required_modes = 0;
 	struct clock *c = &the_clock;
 	struct port *p;
 	unsigned char oui[OUI_LEN];
@@ -1090,15 +1094,17 @@ struct clock *clock_create(enum clock_type type, struct config *config,
 	}
 	c->servo_state = SERVO_UNLOCKED;
 	c->servo_type = servo;
-	c->tsproc = NULL;
-	// c->tsproc = tsproc_create(config_get_int(config, NULL, "tsproc_mode"),
-	// 			  config_get_int(config, NULL, "delay_filter"),
-	// 			  config_get_int(config, NULL, "delay_filter_length"),
-	// 			  config_get_double(config, NULL, "step_threshold"));
-	// if (!c->tsproc) {
-	// 	pr_err("Failed to create time stamp processor");
-	// 	return NULL;
-	// }
+    
+    c->tsproc = NULL;
+	//c->tsproc = tsproc_create(config_get_int(config, NULL, "tsproc_mode"),
+	//			  config_get_int(config, NULL, "delay_filter"),
+	//			  config_get_int(config, NULL, "delay_filter_length"),
+	//			  config_get_double(config, NULL, "step_threshold"));
+	//if (!c->tsproc) {
+	//	pr_err("Failed to create time stamp processor");
+	//	return NULL;
+	//}
+
 	c->nrr = 1.0;
 	c->stats_interval = config_get_int(config, NULL, "summary_interval");
 	c->stats.offset = stats_create();
@@ -1541,34 +1547,44 @@ int clock_poll(struct clock *c)
 
 	if (c->sde) {
 		handle_state_decision_event(c);
+
 		c->sde = 0;
-	}
+    }
 
 	clock_prune_subscriptions(c);
 	return 0;
 }
 
+void clock_update_filter(struct clock *c, struct tsproc *tsproc) {
+    c->tsproc = tsproc;
+	//c->path_delay = ppd;
+	//tsproc_set_delay(c->tsproc, ppd);
+    //if (c->stats.delay) {
+	//	stats_add_value(c->stats.delay, tmv_to_nanoseconds(c->path_delay));
+    //}
+}
+
 void clock_path_delay(struct clock *c, tmv_t path_delay)
 {
-	//tsproc_up_ts(c->tsproc, req, rx);
+    //	tsproc_up_ts(c->tsproc, req, rx);
 
-	//if (tsproc_update_delay(c->tsproc, &c->path_delay))
+    //if (tsproc_update_delay(c->tsproc, &c->path_delay))
 	//	return;
-
-	c->path_delay = path_delay;
+    c->path_delay = path_delay;
+    
 	c->cur.meanPathDelay = tmv_to_TimeInterval(c->path_delay);
 
 	if (c->stats.delay)
-		stats_add_value(c->stats.delay,
-				tmv_to_nanoseconds(c->path_delay));
+		stats_add_value(c->stats.delay, tmv_to_nanoseconds(c->path_delay));
 }
 
 void clock_peer_delay(struct clock *c, tmv_t ppd, tmv_t req, tmv_t rx,
 		      double nrr)
 {
-	if (!c->tsproc)
-		return;
-
+    if(!c->tsproc) {
+        return;
+    }
+    
 	c->path_delay = ppd;
 	c->nrr = nrr;
 
@@ -1577,19 +1593,6 @@ void clock_peer_delay(struct clock *c, tmv_t ppd, tmv_t req, tmv_t rx,
 
 	if (c->stats.delay)
 		stats_add_value(c->stats.delay, tmv_to_nanoseconds(ppd));
-}
-
-void clock_update_filter(struct clock *c, struct tsproc *tsproc) {
-	c->tsproc = tsproc;
-	//c->path_delay = ppd;
-	//tsproc_set_delay(c->tsproc, ppd);
-	//if (c->stats.delay)
-	//	stats_add_value(c->stats.delay, tmv_to_nanoseconds(c->path_delay));
-}
-
-void clock_update_best_identity(struct clock *c, struct ClockIdentity *id)
-{
-	memcpy(&c->best_id, id, sizeof(c->best_id));
 }
 
 int clock_slave_only(struct clock *c)
@@ -1640,11 +1643,13 @@ int clock_switch_phc(struct clock *c, int phc_index)
 enum servo_state clock_synchronize(struct clock *c, tmv_t ingress, tmv_t origin)
 {
 	double adj, weight;
+
 	enum servo_state state = SERVO_UNLOCKED;
 
-	if (!c->tsproc)
-		return c->servo_state;
-
+    if(!c->tsproc) {
+        return c->servo_state;
+    }
+    
 	c->ingress_ts = ingress;
 
 	tsproc_down_ts(c->tsproc, origin, ingress);
@@ -1665,13 +1670,13 @@ enum servo_state clock_synchronize(struct clock *c, tmv_t ingress, tmv_t origin)
 	c->servo_state = state;
 
 	if (c->stats.max_count > 1) {
-		clock_stats_update(c, tmv_to_nanoseconds(c->master_offset), adj);
+		clock_stats_update(c, &c->stats, tmv_to_nanoseconds(c->master_offset), adj);    
 	} else {
 		pr_info("master offset %10" PRId64 " s%d freq %+7.0f "
 			"path delay %9" PRId64 " ingress %9" PRId64,
 			tmv_to_nanoseconds(c->master_offset), state, adj,
 			tmv_to_nanoseconds(c->path_delay),
-			tmv_to_nanoseconds(tmv_sub(ingress, origin)));
+            tmv_to_nanoseconds(tmv_sub(ingress, origin)));
 	}
 
 	tsproc_set_clock_rate_ratio(c->tsproc, clock_rate_ratio(c));
@@ -1717,7 +1722,7 @@ void clock_sync_interval(struct clock *c, int n)
 	shift = c->stats_interval - n;
 	if (shift < 0)
 		shift = 0;
-	else if ((unsigned)shift >= sizeof(int) * 8) {
+        else if ((unsigned)shift >= sizeof(int) * 8) {
 		shift = sizeof(int) * 8 - 1;
 		pr_warning("summary_interval is too long");
 	}
@@ -1734,6 +1739,11 @@ struct timePropertiesDS *clock_time_properties(struct clock *c)
 void clock_update_time_properties(struct clock *c, struct timePropertiesDS tds)
 {
 	c->tds = tds;
+}
+
+void clock_update_best_identity(struct clock *c, struct ClockIdentity *id) 
+{
+    memcpy(&c->best_id, id, sizeof(struct ClockIdentity));
 }
 
 static void handle_state_decision_event(struct clock *c)
@@ -1758,11 +1768,11 @@ static void handle_state_decision_event(struct clock *c)
 	}
 
 	if (!cid_eq(&best_id, &c->best_id)) {
-		pr_notice("selected best master clock %s", cid2str(&best_id));
+        pr_notice("selected best master clock %s", cid2str(&best_id));
 
 		clock_freq_est_reset(c);
-		tsproc_reset(c->tsproc, 1);
-		c->ingress_ts = tmv_zero();
+        tsproc_reset(c->tsproc, 1);
+        c->ingress_ts = tmv_zero();
 		c->path_delay = 0;
 		c->nrr = 1.0;
 		fresh_best = 1;
@@ -1780,11 +1790,11 @@ static void handle_state_decision_event(struct clock *c)
 			event = EV_NONE;
 			break;
 		case PS_GRAND_MASTER:
-			if (!clock_slave_only(c)) {
-				pr_notice("assuming the grand master role");
-				clock_update_grandmaster(c);
-			}
-			event = EV_RS_GRAND_MASTER;
+            if(!clock_slave_only(c)) {
+                pr_notice("assuming the grand master role");
+                clock_update_grandmaster(c);
+            }
+            event = EV_RS_GRAND_MASTER;
 			break;
 		case PS_MASTER:
 			event = EV_RS_MASTER;
@@ -1834,33 +1844,34 @@ double clock_rate_ratio(struct clock *c)
 extern int rv_get_port_status(struct rv_ptpport_t *rv_ptpport, struct port *p);
 
 int rv_get_clock_status(struct rv_ptpclock_t *rv_clock, struct clock *c) {
-	struct port *piter = NULL;
+    struct port *piter = NULL;
 
-	if (!c)
-		return -1;
+    if (!c) {
+        return -1;
+    }
+    strncpy(rv_clock->clk_id, cid2str(&c->dds.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+    
+    rv_clock->offset = tmv_to_nanoseconds(c->master_offset);
+    rv_clock->offset_sign = 0;
+    if(rv_clock->offset < 0) {
+        rv_clock->offset_sign = 1;
+    }
+    
+    rv_clock->clk_accuracy = c->dds.clockQuality.clockAccuracy;
+    rv_clock->clk_class    = c->dds.clockQuality.clockClass;
 
-	strncpy(rv_clock->clk_id, cid2str(&c->dds.clockIdentity), RV_PTP_CLOCK_ID_STRING_SIZE - 1);
+    rv_clock->traceable = c->tds.flags & TIME_TRACEABLE ? true : false;
+    
+    rv_clock->port_count = 0;
+    LIST_FOREACH(piter, &c->ports, list) {
+        if(rv_clock->port_count >= RV_PTP_MAX_PORTS) {
+            break;
+        }
+        
+        rv_get_port_status(&rv_clock->port[rv_clock->port_count], piter);
 
-	rv_clock->offset = tmv_to_nanoseconds(c->master_offset);
-	rv_clock->offset_sign = 0;
+        ++rv_clock->port_count;
+    }
 
-	if (rv_clock->offset < 0)
-		rv_clock->offset_sign = 1;
-
-	rv_clock->clk_accuracy = c->dds.clockQuality.clockAccuracy;
-	rv_clock->clk_class    = c->dds.clockQuality.clockClass;
-
-	rv_clock->traceable = (c->tds.flags & TIME_TRACEABLE) != 0;
-
-	rv_clock->port_count = 0;
-
-	LIST_FOREACH(piter, &c->ports, list) {
-		if (rv_clock->port_count >= RV_PTP_MAX_PORTS)
-			break;
-
-		rv_get_port_status(&rv_clock->port[rv_clock->port_count], piter);
-		++rv_clock->port_count;
-	}
-
-	return 0;
+    return 0;
 }

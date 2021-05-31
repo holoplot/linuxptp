@@ -88,15 +88,15 @@ int count_char(const char *str, char c)
 	return num;
 }
 
-char *pid2str(struct PortIdentity *id)
+char *pid2str(char *dest, size_t len, struct PortIdentity *id)
 {
-	static char buf[64];
+	//static char buf[64];
 	unsigned char *ptr = id->clockIdentity.id;
-	snprintf(buf, sizeof(buf), "%02x%02x%02x.%02x%02x.%02x%02x%02x-%hu",
+	snprintf(dest, len, "%02x%02x%02x.%02x%02x.%02x%02x%02x-%hu",
 		 ptr[0], ptr[1], ptr[2], ptr[3],
 		 ptr[4], ptr[5], ptr[6], ptr[7],
 		 id->portNumber);
-	return buf;
+	return dest;
 }
 
 int str2mac(const char *s, unsigned char mac[MAC_LEN])
@@ -161,7 +161,7 @@ static size_t strlen_utf8(const Octet *s)
 int static_ptp_text_copy(struct static_ptp_text *dst, const struct PTPText *src)
 {
 	int len = src->length;
-	if (dst->max_symbols > 0 && strlen_utf8(src->text) > dst->max_symbols)
+	if (dst->max_symbols > 0 && (strlen_utf8(src->text) > (size_t)dst->max_symbols))
 		return -1;
 	dst->length = len;
 	memcpy(dst->text, src->text, len);
@@ -195,7 +195,7 @@ int static_ptp_text_set(struct static_ptp_text *dst, const char *src)
 	int len = strlen(src);
 	if (len > MAX_PTP_OCTETS)
 		return -1;
-	if (dst->max_symbols > 0 && strlen_utf8((Octet *) src) > dst->max_symbols)
+	if (dst->max_symbols > 0 && (strlen_utf8((Octet *) src) > (size_t)dst->max_symbols))
 		return -1;
 	dst->length = len;
 	memcpy(dst->text, src, len);

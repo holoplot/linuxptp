@@ -61,7 +61,8 @@ int count_char(const char *str, char c);
  * @param id  Port idendtity to show.
  * @return    Pointer to a static global buffer holding the result.
  */
-char *pid2str(struct PortIdentity *id);
+char *pid2str(char *dest, size_t len, struct PortIdentity *id);
+//char *pid2str(struct PortIdentity *id);
 
 /**
  * Scan a string containing a MAC address and convert it into binary form.

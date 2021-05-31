@@ -22,6 +22,7 @@
 
 #include "filter.h"
 
+
 struct filter *outlier_detect_create(int length, double threshold);
 
 #endif

@@ -181,8 +181,8 @@ struct config_item config_tab[] = {
 	PORT_ITEM_INT("delay_filter_length", 10, 1, INT_MAX),
 	PORT_ITEM_ENU("delay_mechanism", DM_E2E, delay_mech_enu),
         // LAWO: the next 2 items are a temporary hack for backward compatibility
-	GLOB_ITEM_INT("tosEventMessage", 56, 0, 63),
-	GLOB_ITEM_INT("tosGeneralMessage", 46, 0, 46),
+        GLOB_ITEM_INT("tosEventMessage", 56, 0, 63),
+        GLOB_ITEM_INT("tosGeneralMessage", 46, 0, 46),
 	GLOB_ITEM_INT("dscp_event", 0, 0, 63),
 	GLOB_ITEM_INT("dscp_general", 0, 0, 63),
 	GLOB_ITEM_INT("domainNumber", 0, 0, 127),
@@ -622,7 +622,6 @@ struct config *config_create(void)
 	char buf[CONFIG_LABEL_SIZE + 8];
 	struct config_item *ci;
 	struct config *cfg;
-	unsigned int i;
 
 	cfg = calloc(1, sizeof(*cfg));
 	if (!cfg) {
@@ -637,7 +636,7 @@ struct config *config_create(void)
 	}
 
 	/* Populate the hash table with global defaults. */
-	for (i = 0; i < N_CONFIG_ITEMS; i++) {
+	for (unsigned i = 0; i < N_CONFIG_ITEMS; i++) {
 		ci = &config_tab[i];
 		ci->flags |= CFG_ITEM_STATIC;
 		snprintf(buf, sizeof(buf), "global.%s", ci->label);
@@ -648,7 +647,7 @@ struct config *config_create(void)
 	}
 
 	/* Perform a Built In Self Test.*/
-	for (i = 0; i < N_CONFIG_ITEMS; i++) {
+	for (unsigned i = 0; i < N_CONFIG_ITEMS; i++) {
 		ci = &config_tab[i];
 		ci = config_global_item(cfg, ci->label);
 		if (ci != &config_tab[i]) {

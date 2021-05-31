@@ -70,40 +70,41 @@ int clockcheck_sample(struct clockcheck *cc, uint64_t ts)
 		return ret;
 
 	interval = (int64_t)ts - cc->last_ts;
-	if (interval >= 0 && interval < CHECK_MIN_INTERVAL)
+	if (interval >= 0 && interval < CHECK_MIN_INTERVAL) {
 		return ret;
+	}
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
-	mono_ts = now.tv_sec * 1000000000LL + now.tv_nsec;
-	mono_interval = (int64_t)mono_ts - cc->last_mono_ts;
+	if(now.tv_nsec < 0) {
+        return ret;
+	}
 
-	if (mono_interval < CHECK_MIN_INTERVAL)
+	mono_ts = now.tv_sec * 1000000000LL + now.tv_nsec;
+	mono_interval = (int64_t)(mono_ts - cc->last_mono_ts);
+
+	if (mono_interval < CHECK_MIN_INTERVAL) {
 		return ret;
+	}
 
 	if (cc->last_ts && cc->max_freq <= CHECK_MAX_FREQ) {
-		max_foffset = 1e9 * (interval /
-				     (1.0 + cc->min_freq / 1e9) /
-				     mono_interval - 1.0);
-		min_foffset = 1e9 * (interval /
-				     (1.0 + cc->max_freq / 1e9) /
-				     mono_interval - 1.0);
+		max_foffset = 1e9 * (interval / (1.0 + cc->min_freq / 1e9) / mono_interval - 1.0);
+		min_foffset = 1e9 * (interval / (1.0 + cc->max_freq / 1e9) / mono_interval - 1.0);
 
 		if (min_foffset > cc->freq_limit) {
-			pr_warning("clockcheck: clock jumped forward or"
-					" running faster than expected!");
+			pr_warning("clockcheck: clock jumped forward or running faster than expected!");
 			ret = 1;
 		} else if (max_foffset < -cc->freq_limit) {
-			pr_warning("clockcheck: clock jumped backward or"
-					" running slower than expected!");
+			pr_warning("clockcheck: clock jumped backward or running slower than expected!");
 			ret = 1;
 		}
 
-		if (ret) {
-			pr_warning("interval      %lld", (long long)interval);
-			pr_warning("mono_interval %lld", (long long)mono_interval);
-			pr_warning("min_freq      %d", cc->min_freq);
-			pr_warning("max_freq      %d", cc->max_freq);
-		}
+        // add some info for debugging
+        if(ret) {
+            pr_warning("interval      %lld", (long long)interval);
+            pr_warning("mono_interval %lld", (long long)mono_interval);
+            pr_warning("min_freq      %d", cc->min_freq);
+            pr_warning("max_freq      %d", cc->max_freq);
+        }
 	}
 
 	cc->last_mono_ts = mono_ts;
