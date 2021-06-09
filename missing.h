@@ -63,6 +63,7 @@ enum _missing_hwtstamp_tx_types {
 #endif
 
 #ifndef HAVE_CLOCK_ADJTIME
+#error XX
 static inline int clock_adjtime(clockid_t id, struct timex *tx)
 {
 	return syscall(__NR_clock_adjtime, id, tx);
