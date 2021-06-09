@@ -73,7 +73,7 @@ set (CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g")
 set (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 
 add_definitions (-D_GNU_SOURCE -D_POSIX_SYNCHRONIZED_IO -D_POSIX_C_SOURCE=200112L)
-set (EXT_LIBS ${EXT_LIBS} systemd rt m dl)
+set (EXT_LIBS ${EXT_LIBS} rt m dl)
 
 add_subdirectory(src)
 #add_subdirectory(test)
