@@ -1,68 +1,79 @@
-# linuxptp/src/CMakeLists.txt  --  Ravenna Project
+# linuxptp/CMakeLists.txt  --  Ravenna Project
 # Copyright (C) 2013, ALC NetworX GmbH -- All rights reserved.
 # For copyright information and disclaimer see file COPYRIGHT in root directory of source tree (or contact ALC NetworX GmbH)
 
-find_package(PkgConfig REQUIRED)
+cmake_minimum_required(VERSION 2.8)
+project(linuxptp)
 
-include(CheckLibraryExists)
-
-CHECK_LIBRARY_EXISTS(rt clock_adjtime "time.h" HAVE_CLOCK_ADJTIME)
-if(HAVE_CLOCK_ADJTIME)
-    add_definitions (-DHAVE_CLOCK_ADJTIME)
-endif(HAVE_CLOCK_ADJTIME)
-
-add_definitions(-D_LARGEFILE64_SOURCE)
-add_definitions(-DHAVE_ONESTEP_SYNC)
-add_definitions(-DVER=1.8)
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
-
-# generate schema.inc in the binary directory if someone wants to check against the json schema
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/schema.inc
-    COMMAND cat "${CMAKE_CURRENT_SOURCE_DIR}/schema.json" | "${CMAKE_SOURCE_DIR}/cmake/json2cString.sh" linuxptp_schema > "${CMAKE_CURRENT_BINARY_DIR}/schema.inc"
-)
-
-FILE(GLOB linuxptp_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/*.[ch])
-source_group("Private Source Files" FILES ${linuxptp_SOURCES})
-
-#add_executable(hwstamp_ctl hwstamp_ctl.c ${CMAKE_CURRENT_BINARY_DIR}/schema.inc)
-#target_link_libraries(hwstamp_ctl linuxptp)
-#install (TARGETS hwstamp_ctl DESTINATION ./)
-
-#add_executable(phc2sys phc2sys.c)
-#target_link_libraries(phc2sys linuxptp)
-#install (TARGETS phc2sys DESTINATION ./)
-
-#add_executable(pmc pmc.c pmc.c)
-#target_link_libraries(pmc linuxptp)
-#install (TARGETS pmc DESTINATION ./)
-
-if(NOT DEFINED pkg_uv_FOUND)
-    pkg_search_module(pkg_uv REQUIRED libuv)
+if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+    message(FATAL_ERROR "In-source builds are not allowed!")
 endif()
 
-if(NOT DEFINED pkg_jansson_FOUND)
-    pkg_search_module(pkg_jansson REQUIRED jansson)
-endif()
+if (NOT CMAKE_BUILD_TYPE)
+    set (CMAKE_BUILD_TYPE RELWITHDEBINFO)
+    message (STATUS "No build type selected, default to RELWITHDEBINFO")
+endif ()
 
-find_library(PAHO_MQTT paho-mqtt3as REQUIRED)
+if((${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm-imx") OR (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm") OR (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "armv5e-poky"))
+    message(STATUS "RAVENNA target platform set to COMIMX Linux")
 
-add_executable(ptp4l ${linuxptp_SOURCES})
+    if (RV_PROFILE_GENERATE)
+        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-generate")
+        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-generate")
+    elseif (RV_PROFILE_USE)
+        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-use")
+        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-use")
+    endif ()
+    
+    if (NOT DEFINED CMAKE_INSTALL_PREFIX)
+        set (CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/build/arm-imx25-linux-gnueabi/release)
+    endif ()
+    
+    set (EXT_LIBS ${EXT_LIBS} atomic)
+elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "core2-64")
+    message(STATUS "RAVENNA target platform set to UHDCORE Linux")
 
-target_include_directories(ptp4l 
-    PRIVATE 
-        ${pkg_uv_INCLUDE_DIRS} 
-        ${pkg_jansson_INCLUDE_DIRS} 
-)
+    if (RV_PROFILE_GENERATE)
+        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-generate")
+        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-generate")
+    elseif (RV_PROFILE_USE)
+        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-use")
+        set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-use")
+    endif ()
+    
+    if (NOT DEFINED CMAKE_INSTALL_PREFIX)
+        set (CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/build/i686-mcx-linux-gnu/release)
+    endif ()
+    
+    set (EXT_LIBS ${EXT_LIBS} atomic)
+else()
+    message(STATUS "RAVENNA target platform set to PC Linux")
 
-target_link_libraries(ptp4l
-    PRIVATE
-        ${pkg_uv_LIBRARIES} 
-        ${pkg_jansson_LIBRARIES} 
-        ${PAHO_MQTT}
-        ${EXT_LIBS}
-	m
-)
+    if (RV_PROFILE_GENERATE)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+    endif ()
+    
+    # install folder for the x86 build lawo build system
+    if (NOT DEFINED CMAKE_INSTALL_PREFIX)
+        set (CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/build/i686-mcx-linux-gnu/release)
+    endif ()
+endif ()
 
-install (TARGETS ptp4l DESTINATION bin)
+message (STATUS ${CMAKE_GENERATOR})
+
+# Linux/gcc compiler settings
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11 -Wall -Wextra -Wformat=2 -Wsign-compare -Wshadow -Wno-unused-parameter -Wno-unused-result -ffast-math")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wextra -Wsign-compare -Wno-unused-parameter")
+
+set (CMAKE_C_FLAGS_DEBUG "-g -fsanitize=address -fsanitize=leak -fsanitize=undefined -fstack-protector-all")
+set (CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address -fsanitize=leak -fsanitize=undefined -fstack-protector-all")
+
+set (CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g")
+set (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
+
+add_definitions (-D_GNU_SOURCE -D_POSIX_SYNCHRONIZED_IO -D_POSIX_C_SOURCE=200112L)
+set (EXT_LIBS ${EXT_LIBS} systemd rt m dl)
+
+add_subdirectory(src)
+#add_subdirectory(test)
