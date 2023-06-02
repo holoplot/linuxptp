@@ -30,9 +30,9 @@ source_group("Private Source Files" FILES ${linuxptp_SOURCES})
 #target_link_libraries(hwstamp_ctl linuxptp)
 #install (TARGETS hwstamp_ctl DESTINATION ./)
 
-#add_executable(phc2sys phc2sys.c)
-#target_link_libraries(phc2sys linuxptp)
-#install (TARGETS phc2sys DESTINATION ./)
+add_executable(phc2sys phc2sys.c)
+target_link_libraries(phc2sys linuxptp)
+install (TARGETS phc2sys DESTINATION ./)
 
 #add_executable(pmc pmc.c pmc.c)
 #target_link_libraries(pmc linuxptp)
