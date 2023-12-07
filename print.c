@@ -67,13 +67,13 @@ void print(int level, char const *format, ...)
 
 	if (verbose) {
 		f = level >= LOG_NOTICE ? stdout : stderr;
-		fprintf(f, "%s[%ld.%03ld]: %s\n",
+		fprintf(f, "%s[%lld.%03ld]: %s\n",
 			progname ? progname : "",
-			ts.tv_sec, ts.tv_nsec / 1000000, buf);
+			(long long)ts.tv_sec, ts.tv_nsec / 1000000, buf);
 		fflush(f);
 	}
 	if (use_syslog) {
-		syslog(level, "[%ld.%03ld] %s",
-		       ts.tv_sec, ts.tv_nsec / 1000000, buf);
+		syslog(level, "[%lld.%03ld] %s",
+		       (long long)ts.tv_sec, ts.tv_nsec / 1000000, buf);
 	}
 }
